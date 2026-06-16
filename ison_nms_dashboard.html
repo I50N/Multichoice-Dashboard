@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NMS Campaign Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  /* ══ THEME: DARK (default) ══ */
+  :root, [data-theme="dark"] {
+    --red:#E2001A; --dark:#0F0F12; --mid:#1C1C22; --panel:#242430;
+    --border:#2E2E3A; --muted:#5A5A72; --text:#D8D8E8; --bright:#FFFFFF;
+    --green:#22C55E; --amber:#F59E0B; --blue:#3B82F6; --purple:#8B5CF6;
+    --life:#3B82F6; --nonlife:#8B5CF6;
+    --shadow: none;
+  }
+  /* ══ THEME: LIGHT ══ */
+  [data-theme="light"] {
+    --red:#C8102E; --dark:#F4F5F7; --mid:#FFFFFF; --panel:#FFFFFF;
+    --border:#E2E4EA; --muted:#76798A; --text:#2B2D3A; --bright:#15161C;
+    --green:#16A34A; --amber:#D97706; --blue:#2563EB; --purple:#7C3AED;
+    --life:#2563EB; --nonlife:#7C3AED;
+    --shadow: 0 1px 2px rgba(20,20,30,0.06), 0 1px 12px rgba(20,20,30,0.04);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--dark);color:var(--text);min-height:100vh;transition:background 0.2s,color 0.2s;}
+
+  /* HEADER */
+  .header{background:var(--mid);border-bottom:2px solid var(--red);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+  .header-brand{display:flex;align-items:center;gap:14px;}
+  .nms-mark{width:42px;height:42px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:white;letter-spacing:-0.5px;}
+  .header-title{font-size:16px;font-weight:600;color:var(--bright);}
+  .header-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+  .header-right{display:flex;align-items:center;gap:14px;}
+  .last-updated{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+  .reload-btn{background:var(--red);color:white;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity 0.2s;}
+  .reload-btn:hover{opacity:0.85;}
+  .reload-btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .theme-toggle{background:var(--border);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .theme-toggle:hover{border-color:var(--muted);}
+
+  /* LOADING OVERLAY */
+  #loading-overlay{position:fixed;inset:0;background:rgba(15,15,18,0.92);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+  [data-theme="light"] #loading-overlay{background:rgba(244,245,247,0.95);}
+  #loading-overlay.hidden{display:none;}
+  .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-text{font-size:13px;color:var(--muted);}
+
+  /* ERROR BANNER */
+  #error-banner{background:rgba(226,0,26,0.12);border:1px solid rgba(226,0,26,0.3);border-radius:8px;padding:14px 20px;margin:20px 28px;font-size:13px;color:#ff6b7a;display:none;align-items:center;gap:10px;}
+
+  /* TABS */
+  .tabs{background:var(--mid);padding:0 28px;display:flex;gap:4px;border-bottom:1px solid var(--border);overflow-x:auto;}
+  .tab-btn{padding:11px 18px;border:none;background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap;}
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--red);border-bottom-color:var(--red);}
+
+  /* VIEWS */
+  .view{display:none;padding:24px 28px;}
+  .view.active{display:block;}
+
+  /* SECTION LABEL */
+  .section-label{font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;margin-top:8px;display:flex;align-items:center;gap:10px;}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+  /* KPI GRID */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+  .kpi-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;position:relative;overflow:hidden;box-shadow:var(--shadow);}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent,var(--red));}
+  .kpi-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:7px;}
+  .kpi-value{font-size:24px;font-weight:700;color:var(--bright);line-height:1;font-family:'DM Mono',monospace;}
+  .kpi-sub{font-size:11px;color:var(--muted);margin-top:5px;}
+
+  /* CARDS */
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:var(--shadow);}
+  .card-title{font-size:13px;font-weight:600;color:var(--bright);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .card-title .dot{width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;}
+
+  /* LAYOUT */
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media(max-width:860px){.two-col{grid-template-columns:1fr;}}
+
+  /* BAR CHART */
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+  .bar-label{font-size:12px;color:var(--text);width:190px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .bar-track{flex:1;background:var(--border);border-radius:4px;height:8px;}
+  .bar-fill{height:100%;border-radius:4px;transition:width 0.5s ease;}
+  .bar-val{font-size:12px;font-family:'DM Mono',monospace;color:var(--muted);width:48px;text-align:right;}
+
+  /* TABLE */
+  .data-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .data-table th{font-size:10px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+  .data-table td{padding:9px 10px;border-bottom:1px solid var(--border);}
+  .data-table tr:last-child td{border-bottom:none;}
+  .data-table tr:hover td{background:rgba(120,120,140,0.06);}
+  .num{font-family:'DM Mono',monospace;color:var(--bright);}
+  .name-cell{font-weight:500;color:var(--bright);}
+
+  /* SPLIT BAR */
+  .split-bar{height:18px;border-radius:5px;overflow:hidden;display:flex;margin:10px 0;}
+  .split-seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:white;}
+  .split-legend{display:flex;gap:14px;font-size:12px;}
+  .split-dot{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:4px;}
+
+  /* WATERFALL */
+  .waterfall{display:flex;flex-direction:column;gap:2px;}
+  .wf-stage{display:grid;grid-template-columns:170px 1fr 90px 70px;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .wf-stage:last-child{border-bottom:none;}
+  .wf-name{font-size:12px;font-weight:600;color:var(--text);}
+  .wf-bar-track{background:var(--border);border-radius:5px;height:22px;position:relative;overflow:hidden;}
+  .wf-bar-fill{height:100%;border-radius:5px;display:flex;align-items:center;padding-left:10px;font-size:11px;font-weight:600;color:white;font-family:'DM Mono',monospace;transition:width 0.6s ease;}
+  .wf-val{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--bright);text-align:right;}
+  .wf-drop{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:right;}
+
+  /* SEGMENT PILLS */
+  .seg-pills{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .seg-pill{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--muted);transition:all 0.15s;}
+  .seg-pill:hover{color:var(--text);}
+  .seg-pill.active{background:var(--red);color:white;border-color:var(--red);}
+
+  /* AGENT CARDS */
+  .agent-card{display:flex;align-items:center;gap:11px;margin-bottom:10px;padding:10px;border-radius:8px;}
+  .agent-card.top{background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.2);}
+  .agent-card.bottom{background:rgba(226,0,26,0.07);border:1px solid rgba(226,0,26,0.2);}
+  .rank-badge{width:25px;height:25px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+  .r1{background:#FFD700;color:#0F0F12;} .r2{background:#C0C0C0;color:#0F0F12;} .r3{background:#CD7F32;color:white;}
+  .r-other{background:var(--border);color:var(--muted);}
+  .r-bot{background:rgba(226,0,26,0.2);color:var(--red);}
+
+  /* DISP PILLS */
+  .disp-pill{display:inline-flex;align-items:center;gap:5px;background:var(--border);border-radius:20px;padding:3px 9px;font-size:11px;margin:3px;}
+  .disp-count{font-weight:700;color:var(--bright);font-family:'DM Mono',monospace;}
+
+  /* FOOTER */
+  .footer{padding:18px 28px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--muted);flex-wrap:wrap;gap:6px;}
+
+  /* AGENT FILTER BUTTONS */
+  .agent-filter-btn{background:var(--border);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;transition:all 0.15s;}
+  .agent-filter-btn:hover{color:var(--text);border-color:var(--muted);}
+  .agent-filter-btn.active{background:var(--red);color:white;border-color:var(--red);}
+
+  /* DISPOSITION REPORT */
+  .disp-agent-block{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
+  .disp-agent-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;cursor:pointer;flex-wrap:wrap;gap:10px;}
+  .disp-agent-name{font-size:14px;font-weight:600;color:var(--bright);}
+  .disp-agent-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .disp-agent-stats{display:flex;gap:20px;align-items:center;}
+  .disp-stat{text-align:right;}
+  .disp-stat .val{font-family:'DM Mono',monospace;font-weight:700;font-size:15px;}
+  .disp-stat .lbl{font-size:10px;color:var(--muted);}
+  .disp-toggle{font-size:18px;color:var(--muted);transition:transform 0.2s;user-select:none;}
+  .disp-body{overflow:hidden;}
+  .disp-body.collapsed{display:none;}
+  .disp-category-bar{display:flex;align-items:center;gap:10px;margin-bottom:7px;}
+  .disp-cat-label{font-size:12px;color:var(--text);width:220px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .disp-cat-track{flex:1;background:var(--border);border-radius:4px;height:7px;}
+  .disp-cat-fill{height:100%;border-radius:4px;}
+  .disp-cat-count{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);width:36px;text-align:right;}
+  .disp-cat-pct{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);width:38px;text-align:right;}
+  .disp-summary-pills{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .disp-sum-pill{padding:6px 12px;border-radius:6px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;}
+
+  /* INSIGHTS */
+  .insight-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;box-shadow:var(--shadow);}
+  .insight-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+  .insight-title{font-size:13px;font-weight:700;color:var(--bright);margin-bottom:4px;}
+  .insight-body{font-size:12.5px;color:var(--text);line-height:1.55;}
+  .insight-body b{color:var(--bright);}
+  .badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px;}
+  .badge.good{background:rgba(34,197,94,0.15);color:var(--green);}
+  .badge.bad{background:rgba(226,0,26,0.15);color:var(--red);}
+  .badge.warn{background:rgba(245,158,11,0.15);color:var(--amber);}
+
+  .min-note{font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:14px;}
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- LOADING -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Fetching latest data from GitHub…</div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-brand">
+    <div class="nms-mark">NMS</div>
+    <div>
+      <div class="header-title">NMS Campaign Dashboard</div>
+      <div class="header-sub">Ison Xperiences · Multichoice/NMS Outbound</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="last-updated" id="last-updated">—</div>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+    <button class="reload-btn" id="reload-btn" onclick="loadData()">↻ Refresh Data</button>
+  </div>
+</div>
+
+<!-- ERROR -->
+<div id="error-banner">
+  ⚠ <span id="error-msg">Could not load data.</span>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('exec',this)">📊 Executive Waterfall</button>
+  <button class="tab-btn" onclick="showTab('agents',this)">👥 Agent Dashboard</button>
+  <button class="tab-btn" onclick="showTab('dispositions',this)">📋 Disposition Report</button>
+  <button class="tab-btn" onclick="showTab('insights',this)">💡 Key Insights</button>
+</div>
+
+<!-- ══ TAB 1: EXECUTIVE WATERFALL ══ -->
+<div id="view-exec" class="view active">
+  <div class="section-label">NMS — May 2026 Campaign Snapshot</div>
+  <div class="kpi-grid" id="kpi-exec"></div>
+
+  <div class="section-label">Funnel Waterfall</div>
+  <div class="seg-pills" id="wf-segment-pills">
+    <button class="seg-pill active" data-seg="Total" onclick="setWfSegment('Total',this)">All Campaigns</button>
+    <button class="seg-pill" data-seg="No-DI" onclick="setWfSegment('No-DI',this)">Device Insurance</button>
+    <button class="seg-pill" data-seg="Life" onclick="setWfSegment('Life',this)">Life</button>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Lead-to-Sale Waterfall <span id="wf-seg-label" style="color:var(--muted);font-weight:400;"></span></div>
+    <div class="waterfall" id="waterfall-main"></div>
+  </div>
+
+  <div class="section-label">Campaign Type Performance</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Leads &amp; Sales by Campaign Type</div>
+      <table class="data-table">
+        <thead><tr><th>Type</th><th>Leads</th><th>Contact</th><th>RPC</th><th>Sales</th><th>Contact%</th><th>RPC%</th><th>Conv%</th></tr></thead>
+        <tbody id="campaign-type-table"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Leads by Campaign (Device Insurance / Funeral / Waiver)</div>
+      <div id="campaign-bars"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Disposition Snapshot — Segment Pivots (from NMSIS pivot tables)</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>iSON_DI_Life_only — Top Dispositions</div>
+      <div id="pivot-1"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>iSON_DI_No_Life_Insurance — Top Dispositions</div>
+      <div id="pivot-2"></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>iSON_Life_DI_Only — Top Dispositions</div>
+      <div id="pivot-3"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>iSON_Life_No_DStv_Insurance — Top Dispositions</div>
+      <div id="pivot-4"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB 2: AGENT DASHBOARD ══ -->
+<div id="view-agents" class="view">
+  <div class="section-label">Agent Performance</div>
+  <div class="kpi-grid" id="kpi-agents"></div>
+  <div class="min-note">Rankings and disposition analysis include agents with 300+ leads worked in May 2026, to ensure fair comparison. Rows with no agent name (auto-dialler outcomes) are excluded throughout.</div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--green);"></span>Top 5 Agents — Conversion Rate</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--green);margin-bottom:10px;">▲ TOP PERFORMERS</div>
+      <div id="top5-agents"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--red);"></span>Bottom 5 Agents — Conversion Rate</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--red);margin-bottom:10px;">▼ NEEDS COACHING</div>
+      <div id="bot5-agents"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Campaign Type Split by Agent</div>
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Life vs Device Insurance — All Qualifying Agents</div>
+    <table class="data-table">
+      <thead><tr><th>Agent</th><th>Life Leads</th><th>Life Sales</th><th>Life Conv%</th><th>DI Leads</th><th>DI Sales</th><th>DI Conv%</th><th>Stronger On</th></tr></thead>
+      <tbody id="split-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="section-label">All Agents — Full Stats (300+ leads)</div>
+  <div class="card">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Agent</th><th>Leads</th><th>Contact</th><th>RPC</th><th>Sales</th><th>Contact%</th><th>RPC%</th><th>Conv%</th><th>Status</th></tr></thead>
+      <tbody id="full-agent-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ TAB 3: DISPOSITION REPORT ══ -->
+<div id="view-dispositions" class="view">
+
+  <div class="section-label">Disposition Analysis — Team Level</div>
+  <div class="kpi-grid" id="kpi-disp"></div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Top Dispositions by Volume</div>
+      <div id="disp-bars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Disposition Category Breakdown</div>
+      <div id="disp-summary"></div>
+      <div style="margin-top:14px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Notable Flags</div>
+      <div id="disp-pills"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Disposition Report — Agent Level (300+ leads)</div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-title"><span class="dot"></span>Filter by Agent</div>
+    <div id="agent-selector" style="display:flex;flex-wrap:wrap;gap:8px;">
+      <button class="agent-filter-btn active" onclick="filterAgent('ALL',this)">All Agents</button>
+    </div>
+  </div>
+
+  <div id="disp-report-all"></div>
+
+</div>
+
+<!-- ══ TAB 4: KEY INSIGHTS ══ -->
+<div id="view-insights" class="view">
+  <div class="section-label">Key Insights — May 2026</div>
+  <div id="insights-list"></div>
+</div>
+
+<div class="footer">
+  <div>NMS Campaign · Ison Xperiences</div>
+  <div id="footer-source">Source: raw.githubusercontent.com</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════
+const CSV_URL = 'https://raw.githubusercontent.com/I50N/NMS_Dashboard/refs/heads/main/nms_dashboard_data.csv';
+const MIN_LEADS = 300; // qualifying threshold for agent rankings & disposition analysis
+
+// Executive waterfall figures — sourced from NMSIS_Report.xlsx "Waterfall SnapShot" pivot (May 2026, 19 working days)
+const WATERFALL = {
+  Total:  { Days:19, Leads:598228, Contact:172491, Attempted:2695221, RPC:109486, Sale:7057,  Spin:4.505 },
+  'No-DI':{ Days:19, Leads:57020,  Contact:16570,  Attempted:216351,  RPC:9750,   Sale:577,   Spin:3.794 },
+  Life:   { Days:19, Leads:541208, Contact:155921, Attempted:2478870, RPC:99736,  Sale:6480,  Spin:4.580 },
+};
+const SEG_LABELS = { Total:'(All Campaigns)', 'No-DI':'(Device Insurance)', Life:'(Life)' };
+
+// Disposition pivots from the executive workbook (per-segment, top 10 codes)
+const PIVOTS = {
+  p1: { title:'iSON_DI_Life_only', rows:[
+    ['Wrong number',907,0.2499],['Client hangup - No pitch',756,0.2083],['Client not Available',518,0.1427],
+    ['Affordability',335,0.0923],['Not Interested',312,0.0860],['Client Hangup - Pitched',263,0.0725],
+    ['SALE',252,0.0694],['Quote Declined',141,0.0389],['Unemployed',75,0.0207],['Do not qualify',70,0.0193],
+  ]},
+  p2: { title:'iSON_DI_No_Life_Insurance', rows:[
+    ['Wrong number',6734,0.3000],['Client hangup - No pitch',5287,0.2356],['Not Interested',2755,0.1227],
+    ['Client not Available',2158,0.0961],['Client Hangup - Pitched',1417,0.0631],['Affordability',1386,0.0618],
+    ['Non South African',1087,0.0484],['SALE',583,0.0260],['Do not qualify',552,0.0246],['Unemployed',486,0.0217],
+  ]},
+  p3: { title:'iSON_Life_DI_Only', rows:[
+    ['Wrong number',2712,0.2461],['Client hangup - No pitch',2483,0.2254],['Not Interested',2097,0.1903],
+    ['Affordability',1071,0.0972],['Client not Available',787,0.0714],['Client Hangup - Pitched',694,0.0630],
+    ['Unemployed',432,0.0392],['SALE',322,0.0292],['SALE_WAIVER',267,0.0242],['Callback New Lead',153,0.0139],
+  ]},
+  p4: { title:'iSON_Life_No_DStv_Insurance', rows:[
+    ['Wrong number',13626,0.3029],['Client hangup - No pitch',10916,0.2427],['Not Interested',6553,0.1457],
+    ['Client not Available',3646,0.0811],['Client Hangup - Pitched',3166,0.0704],['Affordability',2614,0.0581],
+    ['SALE',2053,0.0456],['Unemployed',1341,0.0298],['Language Barrier',575,0.0128],['Already contacted',488,0.0108],
+  ]},
+};
+
+let currentWfSegment = 'Total';
+
+// ════════════════════════════════════════════════
+// THEME
+// ════════════════════════════════════════════════
+function toggleTheme() {
+  const body = document.body;
+  const cur = body.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  body.setAttribute('data-theme', next);
+  document.getElementById('theme-toggle').textContent = next === 'dark' ? '🌙 Dark' : '☀️ Light';
+  localStorage.setItem('nms-theme', next);
+}
+(function initTheme(){
+  const saved = (function(){ try { return localStorage.getItem('nms-theme'); } catch(e){ return null; } })();
+  if (saved === 'light') {
+    document.body.setAttribute('data-theme','light');
+    document.getElementById('theme-toggle') && (document.getElementById('theme-toggle').textContent = '☀️ Light');
+  }
+})();
+
+// ════════════════════════════════════════════════
+// TAB / FILTER / TOGGLE HELPERS
+// ════════════════════════════════════════════════
+function showTab(id, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function setWfSegment(seg, btn) {
+  currentWfSegment = seg;
+  document.querySelectorAll('#wf-segment-pills .seg-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderWaterfall();
+}
+
+function filterAgent(name, btn) {
+  document.querySelectorAll('.agent-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.disp-agent-block').forEach(block => {
+    block.style.display = (name === 'ALL' || block.dataset.agent === name) ? 'block' : 'none';
+  });
+}
+
+function toggleDispBlock(header) {
+  const body   = header.nextElementSibling;
+  const toggle = header.querySelector('.disp-toggle');
+  const isOpen = !body.classList.contains('collapsed');
+  body.classList.toggle('collapsed', isOpen);
+  toggle.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+// ════════════════════════════════════════════════
+// CSV PARSER
+// ════════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  return lines.slice(1).map(line => {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let c of line) {
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    cols.push(cur.trim());
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (cols[i] || '').replace(/^"|"$/g, '').trim());
+    return obj;
+  }).filter(r => r['Agent'] && r['Agent'] !== '\\0' && r['Agent'] !== 'N/A');
+}
+
+// ════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════
+const n   = v => parseInt(v) || 0;
+const pct = (a, b) => b > 0 ? (a / b * 100).toFixed(1) : '0.0';
+const fmt = v => Math.round(v).toLocaleString();
+
+function convColor(c) {
+  c = parseFloat(c);
+  return c >= 6 ? 'var(--green)' : c >= 3 ? 'var(--amber)' : 'var(--red)';
+}
+
+function kpiCard(label, value, sub, accent) {
+  return `<div class="kpi-card" style="--accent:${accent}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    <div class="kpi-sub">${sub}</div>
+  </div>`;
+}
+
+function barRow(label, pctVal, color, valLabel) {
+  return `<div class="bar-row">
+    <div class="bar-label" title="${label}">${label}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${Math.min(pctVal,100)}%;background:${color};"></div></div>
+    <div class="bar-val">${valLabel}</div>
+  </div>`;
+}
+
+function pivotBlock(pivot) {
+  const max = pivot.rows[0][1];
+  return pivot.rows.map(([name,count,share]) => {
+    const isGood = name.toLowerCase().includes('sale');
+    const isCb   = name.toLowerCase().includes('callback');
+    const col    = isGood ? 'var(--green)' : isCb ? 'var(--amber)' : 'var(--red)';
+    return barRow(name, count/max*100, col, fmt(count) + ' · ' + (share*100).toFixed(1) + '%');
+  }).join('');
+}
+
+// ════════════════════════════════════════════════
+// EXECUTIVE WATERFALL RENDER
+// ════════════════════════════════════════════════
+function renderWaterfall() {
+  const seg = WATERFALL[currentWfSegment];
+  document.getElementById('wf-seg-label').textContent = SEG_LABELS[currentWfSegment];
+
+  const stages = [
+    { name:'Unique Leads',     val:seg.Leads,     color:'var(--blue)' },
+    { name:'Attempted Calls',  val:seg.Attempted, color:'var(--purple)' },
+    { name:'Total Contact',    val:seg.Contact,   color:'var(--amber)' },
+    { name:'RPC (Cust. Ans.)', val:seg.RPC,       color:'var(--green)' },
+    { name:'Sales',            val:seg.Sale,      color:'var(--red)' },
+  ];
+  const maxVal = stages[0].val;
+  let prevVal = null;
+  document.getElementById('waterfall-main').innerHTML = stages.map(s => {
+    const widthPct = Math.max((s.val / maxVal * 100), 2);
+    const drop = prevVal !== null ? `${pct(s.val, prevVal)}% of prior` : '—';
+    prevVal = s.val;
+    return `<div class="wf-stage">
+      <div class="wf-name">${s.name}</div>
+      <div class="wf-bar-track"><div class="wf-bar-fill" style="width:${widthPct}%;background:${s.color};">${fmt(s.val)}</div></div>
+      <div class="wf-val">${fmt(s.val)}</div>
+      <div class="wf-drop">${drop}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderExecTab() {
+  const total = WATERFALL.Total;
+  document.getElementById('kpi-exec').innerHTML =
+    kpiCard('Days Worked',        total.Days,                          '19 working days (20 wkdays + 2 Sat)', 'var(--blue)')  +
+    kpiCard('Unique Leads',       fmt(total.Leads),                    'Worked in May 2026',                  'var(--red)')   +
+    kpiCard('Total Contact',      fmt(total.Contact),                  `Contact Rate: ${pct(total.Contact,total.Leads)}%`, 'var(--amber)') +
+    kpiCard('RPC',                fmt(total.RPC),                      `RPC Rate: ${pct(total.RPC,total.Contact)}%`, 'var(--purple)') +
+    kpiCard('Sales',              fmt(total.Sale),                     `Conversion: ${pct(total.Sale,total.RPC)}% of RPC`, 'var(--green)') +
+    kpiCard('Spin Rate',          total.Spin.toFixed(2),               'Avg. tries per lead',                 'var(--blue)');
+
+  renderWaterfall();
+
+  // Campaign type table (from Summary View pivot)
+  const campTypes = [
+    { name:'Life',      Leads:392074, Contact:111420, RPC:70240, Sale:4457 },
+    { name:'Non-Life',  Leads:43018,  Contact:10996,  RPC:6139,  Sale:369 },
+  ];
+  document.getElementById('campaign-type-table').innerHTML = campTypes.map(c => `
+    <tr>
+      <td class="name-cell">${c.name}</td>
+      <td class="num">${fmt(c.Leads)}</td><td class="num">${fmt(c.Contact)}</td><td class="num">${fmt(c.RPC)}</td>
+      <td class="num">${fmt(c.Sale)}</td>
+      <td class="num">${pct(c.Contact,c.Leads)}%</td><td class="num">${pct(c.RPC,c.Contact)}%</td>
+      <td class="num" style="color:${convColor(pct(c.Sale,c.Leads))};font-weight:700;">${pct(c.Sale,c.Leads)}%</td>
+    </tr>`).join('') + `
+    <tr style="border-top:1px solid var(--border);font-weight:600;">
+      <td>Grand Total</td><td class="num">435,092</td><td class="num">122,416</td><td class="num">76,379</td>
+      <td class="num">4,826</td><td class="num">28.1%</td><td class="num">62.4%</td><td class="num">1.1%</td>
+    </tr>`;
+
+  // Campaign bars (Device Insurance / Funeral / Waiver — from Summary View)
+  const camps = [
+    { name:'Device Insurance', leads:43018,  color:'var(--purple)' },
+    { name:'Funeral',          leads:24196,  color:'var(--amber)' },
+    { name:'Waiver',           leads:367878, color:'var(--blue)' },
+  ];
+  const maxCamp = Math.max(...camps.map(c=>c.leads));
+  document.getElementById('campaign-bars').innerHTML = camps.map(c => barRow(c.name, c.leads/maxCamp*100, c.color, fmt(c.leads))).join('');
+
+  document.getElementById('pivot-1').innerHTML = pivotBlock(PIVOTS.p1);
+  document.getElementById('pivot-2').innerHTML = pivotBlock(PIVOTS.p2);
+  document.getElementById('pivot-3').innerHTML = pivotBlock(PIVOTS.p3);
+  document.getElementById('pivot-4').innerHTML = pivotBlock(PIVOTS.p4);
+}
+
+// ════════════════════════════════════════════════
+// MAIN RENDER — AGENT / DISPOSITION DATA
+// ════════════════════════════════════════════════
+function categoriseDisp(disp) {
+  const d = disp.toLowerCase();
+  if (d.includes('sale'))                                                                 return 'sale';
+  if (d.includes('callback') || d.includes('call back'))                                  return 'callback';
+  if (d.includes('not interested'))                                                       return 'not_interested';
+  if (d.includes('answering machine') || d.includes('voice mail') || d.includes('voicemail')) return 'voicemail';
+  if (d.includes('no answer'))                                                            return 'no_answer';
+  if (d.includes('wrong number'))                                                         return 'wrong_number';
+  if (d.includes('hang up') || d.includes('hangup'))                                      return 'hang_up';
+  if (d.includes('affordability') || d.includes('unemployed') || d.includes('not qualify')) return 'not_qualified';
+  return 'other';
+}
+const CAT_META = {
+  sale:          { label:'Sales',          color:'var(--green)',  bg:'rgba(34,197,94,0.15)'  },
+  callback:      { label:'Callbacks',      color:'var(--amber)',  bg:'rgba(245,158,11,0.15)' },
+  not_interested:{ label:'Not Interested', color:'var(--blue)',   bg:'rgba(59,130,246,0.15)' },
+  voicemail:     { label:'Voicemail/AM',   color:'var(--muted)',  bg:'rgba(90,90,114,0.2)'   },
+  no_answer:     { label:'No Answer',      color:'var(--muted)',  bg:'rgba(90,90,114,0.2)'   },
+  wrong_number:  { label:'Wrong Number',   color:'var(--purple)', bg:'rgba(139,92,246,0.15)' },
+  hang_up:       { label:'Hung Up',        color:'var(--red)',    bg:'rgba(226,0,26,0.15)'   },
+  not_qualified: { label:'Not Qualified',  color:'var(--amber)',  bg:'rgba(245,158,11,0.1)'  },
+  other:         { label:'Other',          color:'var(--border)', bg:'rgba(120,120,140,0.12)'},
+};
+
+function render(rows) {
+  // Filter out any row with no agent name (defensive — parseCSV already excludes \0)
+  rows = rows.filter(r => r['Agent'] && r['Agent'].trim() !== '');
+
+  // ── AGENT AGGREGATION ──
+  const byAgent = {};
+  rows.forEach(r => {
+    const a    = r['Agent'].trim();
+    const ct   = (r['Campaign Type'] || '').trim();
+    const lead = n(r['Lead']);
+    if (!byAgent[a]) byAgent[a] = {leads:0,contact:0,rpc:0,sale:0, life_leads:0, life_sale:0, di_leads:0, di_sale:0};
+    byAgent[a].leads   += lead;
+    byAgent[a].contact += n(r['Contact']);
+    byAgent[a].rpc     += n(r['RPC']);
+    byAgent[a].sale    += n(r['Sale']);
+    if (ct === 'Life')      { byAgent[a].life_leads += lead; byAgent[a].life_sale += n(r['Sale']); }
+    else if (ct === 'Non-Life') { byAgent[a].di_leads += lead; byAgent[a].di_sale += n(r['Sale']); }
+  });
+
+  const allAgents = Object.entries(byAgent).map(([name, s]) => ({
+    name, ...s,
+    cr: parseFloat(pct(s.contact, s.leads)),
+    rr: parseFloat(pct(s.rpc, s.contact)),
+    conv: parseFloat(pct(s.sale, s.leads)),
+    life_conv: parseFloat(pct(s.life_sale, s.life_leads)),
+    di_conv: parseFloat(pct(s.di_sale, s.di_leads)),
+  }));
+
+  const qualifying = allAgents.filter(a => a.leads >= MIN_LEADS).sort((a,b) => b.conv - a.conv);
+
+  // ── DISPOSITION AGGREGATION (qualifying agents only) ──
+  const qualNames = new Set(qualifying.map(a=>a.name));
+  const qualRows = rows.filter(r => qualNames.has(r['Agent'].trim()));
+
+  const byDisp = {};
+  qualRows.forEach(r => {
+    const d = (r['Disposition'] || 'Unknown').trim();
+    byDisp[d] = (byDisp[d]||0) + n(r['Lead']);
+  });
+  const dispSorted = Object.entries(byDisp).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const totalQualLeads = qualifying.reduce((s,a)=>s+a.leads,0);
+  const totalQualSale  = qualifying.reduce((s,a)=>s+a.sale,0);
+  const totalQualContact = qualifying.reduce((s,a)=>s+a.contact,0);
+
+  const byCat = {};
+  qualRows.forEach(r => {
+    const cat = categoriseDisp(r['Disposition'] || '');
+    byCat[cat] = (byCat[cat]||0) + n(r['Lead']);
+  });
+
+  // Agent x disposition map (for disposition report tab)
+  const agentDispMap = {};
+  qualRows.forEach(r => {
+    const a = r['Agent'].trim();
+    const d = (r['Disposition'] || 'Unknown').trim();
+    const lead = n(r['Lead']);
+    if (lead === 0) return;
+    if (!agentDispMap[a]) agentDispMap[a] = {};
+    agentDispMap[a][d] = (agentDispMap[a][d]||0) + lead;
+  });
+  const agentDispCats = {};
+  Object.entries(agentDispMap).forEach(([agent, disps]) => {
+    agentDispCats[agent] = {};
+    Object.keys(CAT_META).forEach(c => agentDispCats[agent][c] = 0);
+    Object.entries(disps).forEach(([disp, count]) => {
+      agentDispCats[agent][categoriseDisp(disp)] += count;
+    });
+  });
+
+  // ════════════════════════════════════════════════
+  // RENDER — AGENT DASHBOARD
+  // ════════════════════════════════════════════════
+  document.getElementById('kpi-agents').innerHTML =
+    kpiCard('Qualifying Agents', qualifying.length,                    `${allAgents.length} total tracked`,    'var(--green)') +
+    kpiCard('Qual. Total Sales', fmt(totalQualSale),                   `${fmt(totalQualLeads)} leads worked`, 'var(--red)')   +
+    kpiCard('Qual. Conv Rate',   pct(totalQualSale,totalQualLeads)+'%',`${fmt(totalQualSale)} / ${fmt(totalQualLeads)}`, 'var(--blue)') +
+    kpiCard('Qual. Contact Rate',pct(totalQualContact,totalQualLeads)+'%', `${fmt(totalQualContact)} / ${fmt(totalQualLeads)}`, 'var(--purple)') +
+    kpiCard('Top Agent Conv',    (qualifying[0]?.conv||0)+'%',         qualifying[0]?.name||'—',              'var(--amber)') +
+    kpiCard('Lowest Agent Conv', (qualifying[qualifying.length-1]?.conv||0)+'%', qualifying[qualifying.length-1]?.name||'—', '#888');
+
+  const top5 = qualifying.slice(0,5);
+  const bot5 = qualifying.slice(-5);
+
+  function agentCard(a, i, isTop) {
+    const rankLabels = isTop ? ['r1','r2','r3','r-other','r-other'] : ['r-bot','r-bot','r-bot','r-bot','r-bot'];
+    const rankText   = isTop ? (i+1) : `B${i+1}`;
+    const col        = isTop ? 'var(--green)' : 'var(--red)';
+    return `<div class="agent-card ${isTop?'top':'bottom'}">
+      <div class="rank-badge ${rankLabels[i]}">${rankText}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;color:var(--bright);font-size:13px;">${a.name}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${fmt(a.leads)} leads · ${fmt(a.contact)} contacts · ${fmt(a.sale)} sales</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'DM Mono',monospace;font-weight:700;color:${col};font-size:16px;">${a.conv}%</div>
+        <div style="font-size:10px;color:var(--muted);">Conv Rate</div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('top5-agents').innerHTML = top5.map((a,i) => agentCard(a,i,true)).join('');
+  document.getElementById('bot5-agents').innerHTML = [...bot5].reverse().map((a,i) => agentCard(a,i,false)).join('');
+
+  // Split table
+  document.getElementById('split-tbody').innerHTML = qualifying.map(a => {
+    const lifeC = isFinite(a.life_conv) ? a.life_conv.toFixed(1) : '0.0';
+    const diC   = isFinite(a.di_conv) ? a.di_conv.toFixed(1) : '0.0';
+    const strong = a.life_conv > a.di_conv
+      ? '<span style="color:var(--life);font-weight:600;">Life</span>'
+      : a.di_conv > a.life_conv
+        ? '<span style="color:var(--nonlife);font-weight:600;">Device Insurance</span>'
+        : '<span style="color:var(--muted);">Equal</span>';
+    return `<tr>
+      <td class="name-cell">${a.name}</td>
+      <td class="num">${fmt(a.life_leads)}</td>
+      <td class="num">${fmt(a.life_sale)}</td>
+      <td class="num" style="color:var(--life);">${lifeC}%</td>
+      <td class="num">${fmt(a.di_leads)}</td>
+      <td class="num">${fmt(a.di_sale)}</td>
+      <td class="num" style="color:var(--nonlife);">${diC}%</td>
+      <td>${strong}</td>
+    </tr>`;
+  }).join('');
+
+  // Full table
+  document.getElementById('full-agent-tbody').innerHTML = qualifying.map((a,i) => {
+    const tier = i < 5
+      ? '<span style="color:var(--green);font-size:11px;font-weight:600;">▲ Top</span>'
+      : i >= qualifying.length - 5
+        ? '<span style="color:var(--red);font-size:11px;font-weight:600;">▼ Low</span>'
+        : '<span style="color:var(--muted);font-size:11px;">—</span>';
+    return `<tr>
+      <td class="num" style="color:var(--muted);">${i+1}</td>
+      <td class="name-cell">${a.name}</td>
+      <td class="num">${fmt(a.leads)}</td><td class="num">${fmt(a.contact)}</td><td class="num">${fmt(a.rpc)}</td>
+      <td class="num">${fmt(a.sale)}</td>
+      <td class="num">${a.cr.toFixed(1)}%</td><td class="num">${a.rr.toFixed(1)}%</td>
+      <td class="num" style="color:${convColor(a.conv)};font-weight:700;">${a.conv.toFixed(1)}%</td>
+      <td>${tier}</td>
+    </tr>`;
+  }).join('');
+
+  // ════════════════════════════════════════════════
+  // RENDER — DISPOSITION REPORT TAB
+  // ════════════════════════════════════════════════
+  document.getElementById('kpi-disp').innerHTML =
+    kpiCard('Qualifying Agents', qualifying.length,           'With 300+ leads',                  'var(--blue)')   +
+    kpiCard('Unique Dispositions', Object.keys(byDisp).length, 'Across qualifying agents',         'var(--purple)') +
+    kpiCard('Top Disposition',   (dispSorted[0]?.[0]||'—').length>18 ? dispSorted[0][0].slice(0,16)+'…' : (dispSorted[0]?.[0]||'—'), `${fmt(dispSorted[0]?.[1]||0)} occurrences`, 'var(--amber)') +
+    kpiCard('Team Sales (Qual.)',fmt(totalQualSale),          'Via disposition flag',             'var(--green)');
+
+  const maxDisp = dispSorted[0]?.[1] || 1;
+  document.getElementById('disp-bars').innerHTML = dispSorted.map(([name, count]) => {
+    const meta = CAT_META[categoriseDisp(name)];
+    return barRow(name, count/maxDisp*100, meta.color, count.toLocaleString());
+  }).join('');
+
+  document.getElementById('disp-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center;">
+      <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:13px;">
+        <div style="font-size:20px;font-weight:700;color:var(--green);font-family:'DM Mono',monospace;">${fmt(byCat.sale||0)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">SALE outcomes</div>
+      </div>
+      <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:13px;">
+        <div style="font-size:20px;font-weight:700;color:var(--amber);font-family:'DM Mono',monospace;">${fmt((byCat.callback||0)+(byCat.not_qualified||0))}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">Callbacks / Not Qualified</div>
+      </div>
+      <div style="background:rgba(226,0,26,0.08);border:1px solid rgba(226,0,26,0.2);border-radius:8px;padding:13px;">
+        <div style="font-size:20px;font-weight:700;color:var(--red);font-family:'DM Mono',monospace;">${fmt((byCat.hang_up||0)+(byCat.wrong_number||0))}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">Hang Up / Wrong Number</div>
+      </div>
+    </div>`;
+
+  document.getElementById('disp-pills').innerHTML = dispSorted.slice(0,10).map(([name,count]) =>
+    `<div class="disp-pill"><span class="disp-count">${fmt(count)}</span>${name}</div>`
+  ).join('');
+
+  // Agent selector
+  const selectorEl = document.getElementById('agent-selector');
+  selectorEl.innerHTML = '<button class="agent-filter-btn active" onclick="filterAgent(\'ALL\',this)">All Agents</button>';
+  qualifying.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'agent-filter-btn';
+    btn.textContent = a.name;
+    btn.title = a.name;
+    btn.onclick = function(){ filterAgent(a.name, this); };
+    selectorEl.appendChild(btn);
+  });
+
+  // Per-agent disposition blocks
+  const dispReportEl = document.getElementById('disp-report-all');
+  dispReportEl.innerHTML = qualifying.map(a => {
+    const disps = agentDispMap[a.name] || {};
+    const cats  = agentDispCats[a.name] || {};
+    const totalLeads = Object.values(disps).reduce((s,v)=>s+v,0);
+    const dispEntries = Object.entries(disps).sort((x,y)=>y[1]-x[1]);
+    const maxCount = dispEntries[0]?.[1] || 1;
+
+    const pillsHtml = Object.entries(CAT_META).map(([cat, meta]) => {
+      const count = cats[cat] || 0;
+      if (count === 0) return '';
+      return `<div class="disp-sum-pill" style="background:${meta.bg};color:${meta.color};">${meta.label}: <b>${fmt(count)}</b></div>`;
+    }).join('');
+
+    const barsHtml = dispEntries.map(([disp, count]) => {
+      const meta  = CAT_META[categoriseDisp(disp)];
+      const barPct = (count / maxCount * 100).toFixed(1);
+      const pctOfTotal = (count / totalLeads * 100).toFixed(1);
+      return `<div class="disp-category-bar">
+        <div class="disp-cat-label" title="${disp}">${disp}</div>
+        <div class="disp-cat-track"><div class="disp-cat-fill" style="width:${barPct}%;background:${meta.color};opacity:0.85;"></div></div>
+        <div class="disp-cat-count">${fmt(count)}</div>
+        <div class="disp-cat-pct">${pctOfTotal}%</div>
+      </div>`;
+    }).join('');
+
+    const convC = convColor(a.conv);
+
+    return `<div class="disp-agent-block" data-agent="${a.name}">
+      <div class="disp-agent-header" onclick="toggleDispBlock(this)">
+        <div>
+          <div class="disp-agent-name">${a.name}</div>
+          <div class="disp-agent-meta">${fmt(totalLeads)} leads · ${dispEntries.length} disposition codes used</div>
+        </div>
+        <div class="disp-agent-stats">
+          <div class="disp-stat">
+            <div class="val" style="color:var(--green);">${fmt(cats.sale||0)}</div>
+            <div class="lbl">Sales</div>
+          </div>
+          <div class="disp-stat">
+            <div class="val" style="color:var(--amber);">${fmt(cats.callback||0)}</div>
+            <div class="lbl">Callbacks</div>
+          </div>
+          <div class="disp-stat">
+            <div class="val" style="color:${convC};">${a.conv.toFixed(1)}%</div>
+            <div class="lbl">Conv Rate</div>
+          </div>
+          <div class="disp-toggle">▼</div>
+        </div>
+      </div>
+      <div class="disp-body collapsed">
+        <div class="disp-summary-pills">${pillsHtml}</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;padding:0 2px;">
+          <span>Disposition Code</span>
+          <span style="display:flex;gap:10px;"><span style="width:36px;text-align:right;">Count</span><span style="width:38px;text-align:right;">% Share</span></span>
+        </div>
+        ${barsHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  // ════════════════════════════════════════════════
+  // RENDER — KEY INSIGHTS TAB
+  // ════════════════════════════════════════════════
+  const wf = WATERFALL.Total;
+  const dropToContact = (100 - parseFloat(pct(wf.Contact, wf.Leads))).toFixed(1);
+  const topAgent = qualifying[0];
+  const lowAgent = qualifying[qualifying.length-1];
+  const spread = topAgent && lowAgent ? (topAgent.conv - lowAgent.conv).toFixed(1) : '0';
+  const topDispName = dispSorted[0]?.[0] || '—';
+  const topDispShare = dispSorted.length ? pct(dispSorted[0][1], totalQualLeads) : '0';
+  const wrongNumTotal = byCat.wrong_number || 0;
+  const hangUpTotal = byCat.hang_up || 0;
+  const lifeLeadsAll = 392074, diLeadsAll = 43018;
+  const lifeConvAll = (4457/392074*100).toFixed(2);
+  const diConvAll = (369/43018*100).toFixed(2);
+
+  const insights = [
+    {
+      icon:'📉', color:'var(--amber)', bg:'rgba(245,158,11,0.15)',
+      title:'Contact rate is the biggest funnel leak',
+      body:`Of <b>${fmt(wf.Leads)}</b> unique leads worked, only <b>${pct(wf.Contact,wf.Leads)}%</b> were successfully contacted — meaning <b>${dropToContact}%</b> of leads never reached a conversation. This is the single largest drop-off point in the funnel, ahead of contact-to-RPC and RPC-to-sale.`
+    },
+    {
+      icon:'🏆', color:'var(--green)', bg:'rgba(34,197,94,0.15)',
+      title:'Wide performance spread between top and bottom agents',
+      body:`<b>${topAgent?.name||'—'}</b> converts at <b>${topAgent?.conv||0}%</b>, while <b>${lowAgent?.name||'—'}</b> sits at <b>${lowAgent?.conv||0}%</b> — a <b>${spread}-point</b> gap among agents who each worked 300+ leads. Closing even half this gap across the bottom 5 would meaningfully lift total qualifying-agent sales beyond the current <b>${fmt(totalQualSale)}</b>.`
+    },
+    {
+      icon:'☎️', color:'var(--purple)', bg:'rgba(139,92,246,0.15)',
+      title:'"' + topDispName + '" dominates outcomes',
+      body:`<b>${topDispName}</b> is the most frequent disposition among qualifying agents, accounting for <b>${topDispShare}%</b> of all logged outcomes. Combined, Wrong Number (<b>${fmt(wrongNumTotal)}</b>) and Hang Up (<b>${fmt(hangUpTotal)}</b>) outcomes represent a large share of worked leads with no sales opportunity — pointing to data quality and early-call retention as coaching priorities.`
+    },
+    {
+      icon:'📋', color:'var(--blue)', bg:'rgba(59,130,246,0.15)',
+      title:'Life campaign outconverts Device Insurance',
+      body:`Life leads (<b>${fmt(lifeLeadsAll)}</b> worked) converted at <b>${lifeConvAll}%</b> versus <b>${diConvAll}%</b> for Device Insurance (<b>${fmt(diLeadsAll)}</b> worked). Life carries ~9x the volume of DI but also a meaningfully higher conversion rate, making it the priority segment for resourcing.`
+    },
+    {
+      icon:'🚫', color:'var(--red)', bg:'rgba(226,0,26,0.15)',
+      title:'Auto-dialler outcomes mask true agent performance',
+      body:`A large share of raw NMSIS rows carry no agent name — these are calls resolved by the auto-dialler (disconnected numbers, voicemail-by-machine, engaged lines) before ever reaching an agent. These are excluded from all agent and disposition views in this dashboard to keep rankings and coaching insights accurate to actual agent-handled leads.`
+    },
+    {
+      icon:'⚙️', color:'var(--green)', bg:'rgba(34,197,94,0.15)',
+      title:'Spin rate suggests room to tighten dialling strategy',
+      body:`The team averaged <b>${wf.Spin.toFixed(2)}</b> attempts per lead overall, with Life leads needing slightly more tries (<b>${WATERFALL.Life.Spin.toFixed(2)}</b>) than Device Insurance (<b>${WATERFALL['No-DI'].Spin.toFixed(2)}</b>). Reviewing dial-pacing rules for low-yield list segments could free up agent capacity for higher-propensity leads.`
+    },
+  ];
+
+  document.getElementById('insights-list').innerHTML = insights.map(ins => `
+    <div class="insight-card">
+      <div class="insight-icon" style="background:${ins.bg};">${ins.icon}</div>
+      <div>
+        <div class="insight-title">${ins.title}</div>
+        <div class="insight-body">${ins.body}</div>
+      </div>
+    </div>`).join('');
+
+  // ── UPDATE STATUS ──
+  const now = new Date().toLocaleString('en-ZA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('last-updated').textContent = `Last loaded: ${now}`;
+  document.getElementById('footer-source').textContent = `Source: NMS_Dashboard · ${now}`;
+}
+
+// ════════════════════════════════════════════════
+// FETCH + LOAD
+// ════════════════════════════════════════════════
+async function loadData() {
+  const overlay = document.getElementById('loading-overlay');
+  const errBanner = document.getElementById('error-banner');
+  const reloadBtn = document.getElementById('reload-btn');
+
+  overlay.classList.remove('hidden');
+  errBanner.style.display = 'none';
+  reloadBtn.disabled = true;
+
+  renderExecTab(); // exec tab is static from the executive workbook — render immediately
+
+  try {
+    const res = await fetch(CSV_URL + '?t=' + Date.now());
+    if (!res.ok) throw new Error(`HTTP ${res.status} — Could not fetch CSV from GitHub. Check that the file exists at the configured path.`);
+    const text = await res.text();
+    if (!text.trim()) throw new Error('CSV file is empty.');
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error('CSV parsed but returned no rows. Check column headers match expected format.');
+    render(rows);
+  } catch (err) {
+    document.getElementById('error-msg').textContent = err.message;
+    errBanner.style.display = 'flex';
+    document.getElementById('last-updated').textContent = 'Failed to load agent/disposition data (executive waterfall shown from static figures)';
+  } finally {
+    overlay.classList.add('hidden');
+    reloadBtn.disabled = false;
+  }
+}
+
+// Auto-load on open
+loadData();
+</script>
+</body>
+</html>
